@@ -18,5 +18,5 @@ Copyright by Luis Pacheco
 
 license:
 
-Firmware GPL
-Hardware and models CC BY NC SA
+-Firmware GPL
+-Hardware and models CC BY NC SA
