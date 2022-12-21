@@ -3,6 +3,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "max6675.h"
+#include <ezOutput.h>
 
 // Display variables///
 #define SCREEN_WIDTH 128  // OLED display width, in pixels
@@ -19,7 +20,9 @@ float MotorRev = 800;
 float MotorSpeed = 0;  // rev per minute
 int MotorStep = 5;
 unsigned long LastRunTime = 0;
-
+unsigned long  currentMotorTime = 0;
+unsigned long previousMotorTime = 0;
+long motorInterval = 0.1;
 
 //// Heater Variables ////
 int OutHeater = 3;
@@ -69,10 +72,14 @@ void setup() {
   //// MOTOR setup////
   pinMode(OutDir, OUTPUT);
   pinMode(OutStep, OUTPUT);
+  //outStep.low();
   pinMode(OutEnable, OUTPUT);
   digitalWrite(OutEnable, true); // activate extruder motor
   digitalWrite(OutDir, false);  //Anti-Clockwise
+  //float curSpeed = 0;
   Serial.println("Motor setup OK");
+  currentMotorTime = millis();
+  previousMotorTime = millis();
 
   //// Heater setup////
   pinMode(OutHeater, OUTPUT);
@@ -93,21 +100,33 @@ void loop() {
   digitalWrite(OutFan, FanEnable);
 
   // MOTOR Controller
-  int timeElapsed = millis() - LastRunTime;
-  LastRunTime = millis();
-  if (MotorEnable && MotorSpeed != 0) {
-    float StepPerMillis = MotorRev * MotorSpeed / 60000;  //400 step per rev * 10 rev per minute / 60 000 = 0.0666 per milisec = 66.6 per sec = 4000 per minute
-    Serial.println(StepPerMillis);
-    float MillisPerStep = 1 / StepPerMillis;              // 0.0666 step per milisec = 66.6 per sec = 4000 per minute
-    Serial.println(MillisPerStep);
+  // int timeElapsed = millis() - LastRunTime;
+  // LastRunTime = millis();
+  // if (MotorEnable && MotorSpeed != 0) {
+  //   float StepPerMillis = MotorRev * MotorSpeed / 60000;  //400 step per rev * 10 rev per minute / 60 000 = 0.0666 per milisec = 66.6 per sec = 4000 per minute
+  //   Serial.println(StepPerMillis);
+  //   float MillisPerStep = 1 / StepPerMillis;              // 0.0666 step per milisec = 66.6 per sec = 4000 per minute
+  //   Serial.println(MillisPerStep);
 
-    for (int steps = 0; steps <= timeElapsed / (MillisPerStep + 1); steps++) {
-      digitalWrite(OutStep, HIGH);
-      delayMicroseconds(MillisPerStep * 1000 / 2);
-      digitalWrite(OutStep, LOW);
-      delayMicroseconds(MillisPerStep * 1000 / 2);
-    }
+  //   for (int steps = 0; steps <= timeElapsed / (MillisPerStep + 1); steps++) {
+  //     digitalWrite(OutStep, HIGH);
+  //     delayMicroseconds(MillisPerStep * 1000 / 2);
+  //     digitalWrite(OutStep, LOW);
+  //     delayMicroseconds(MillisPerStep * 1000 / 2);
+  //   }
+  // }
+// better control
+if (MotorEnable && MotorSpeed != 0) {
+  currentMotorTime = millis();
+  Serial.print(currentMotorTime);
+  float StepPerMillis = MotorRev * MotorSpeed / 60000;
+  float MillisPerStep = 1 / StepPerMillis;
+  digitalWrite(OutStep,LOW);
+  if (currentMotorTime - previousMotorTime > motorInterval){
+    digitalWrite(OutStep, HIGH);
+    previousMotorTime = currentMotorTime;
   }
+}
 
   // HEATER Controller TODO PID control
   // int timeElapsedRead = millis() - LastReadTime;
@@ -145,7 +164,7 @@ void loop() {
     OLED();
     Serial.print("Position: ");
     Serial.println(counter);
-    Serial.println(MotorSpeed);
+     Serial.println(MotorSpeed);
   }
   aLastState = aState;  // Updates the previous state of the outputA with the current state
   int btnState = (digitalRead(btn));
@@ -168,6 +187,8 @@ void loop() {
     OLED();
     lastButtonPress = millis();
   }
+  //analogWrite(outRPM,128); //maddies hack write
+  // Serial.println(MotorSpeed);
 }
 
 void OLED(void) {
