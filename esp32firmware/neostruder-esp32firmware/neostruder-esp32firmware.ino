@@ -241,12 +241,16 @@ void loop() {
         // Serial.println("Fan OFF");
         // Serial.println(String(FanEnable));
         FanSpeed = 0;
+        FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
+      ledcWrite(FPWM_Ch, FPWM_DutyCycle);
         //digitalWrite(OutFan, FanEnable);
         //Serial.print('\n');
       } else {
         // Serial.println("Fan ON");
         // Serial.println(String(FanEnable));
         FanSpeed = fvalue *FanStep;
+        FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
+        ledcWrite(FPWM_Ch, FPWM_DutyCycle);
         //digitalWrite(OutFan, FanEnable);
         //Serial.print('\n');
       }
