@@ -21,8 +21,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define FPIN_B 18
 #define FPIN_BUTTON 19
 
-#define FPIN_OUT 13
-#define FPWM_Ch 0
+#define FPIN_OUT 14
+#define FPWM_Ch 1
 #define FPWM_Res   8
 #define FPWM_Freq  250000  //1000 or 250 000
  
@@ -126,8 +126,9 @@ void setup() {
   Serial.println("Reading from encoder: ");
 
   // Fan PWM output
+  ledcSetup(FPWM_Ch,FPWM_Freq,FPWM_Res);
   ledcAttachPin(FPIN_OUT, FPWM_Ch);
-  ledcSetup(FPWM_Ch, FPWM_Freq, FPWM_Res);
+  ledcWrite(FPWM_Ch,FPWM_DutyCycle);
 }
 
 void loop() {
@@ -201,6 +202,7 @@ void loop() {
     }
     FanSpeed = fvalue*FanStep;
     // map(val, incoming_min, incoming_max, desired_min, desired_max);
+    Serial.println(FanSpeed);
     FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
     ledcWrite(FPWM_Ch, FPWM_DutyCycle);
     Serial.println(fvalue);
@@ -217,7 +219,7 @@ void loop() {
       //MotorSpeed -= MotorStep;
       FanSpeed = fvalue*FanStep;
     }
-    //Serial.print("Turned CCW: ");
+    Serial.println(FanSpeed);
     FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
     ledcWrite(FPWM_Ch, FPWM_DutyCycle);
     Serial.println(fvalue);
@@ -233,7 +235,7 @@ void loop() {
     flastWasCCW = false;
   }
   int fbtnState = (digitalRead(FPIN_BUTTON));
-  if (fbtnState == HIGH) {
+  if (fbtnState == LOW) {
     if (millis() - flastButtonPress > DEBONCE_BTN) {
       if (!FanSpeed == 0) {
         // Serial.println("Fan OFF");
