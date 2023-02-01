@@ -23,9 +23,11 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 #define FPIN_OUT 14
 #define FPWM_Ch 1
-#define FPWM_Res   8
-#define FPWM_Freq  250000  //1000 or 250 000
- 
+#define FPWM_Res 8
+#define FPWM_Freq 250000  //1000 or 250 000
+
+#define robotIn 33  // start/stop extruder
+
 int FPWM_DutyCycle = 0;
 
 //Temperature
@@ -75,7 +77,7 @@ int sck = 13;
 int OutStep = 25;
 int OutDir = 26;
 int OutEnable = 27;
-bool MotorEnable = true;
+bool MotorEnable = false;
 float MotorRev = 800;
 float MotorSpeed = 0;  // rev per minute
 int MotorStep = 25;
@@ -83,6 +85,8 @@ unsigned long LastRunTime = 0;
 unsigned long currentMotorTime = 0;
 unsigned long previousMotorTime = 0;
 long motorInterval = 0.1;
+
+bool ignoreRobotMotorSpeed = false;
 
 
 void setup() {
@@ -126,13 +130,17 @@ void setup() {
   Serial.println("Reading from encoder: ");
 
   // Fan PWM output
-  ledcSetup(FPWM_Ch,FPWM_Freq,FPWM_Res);
+  ledcSetup(FPWM_Ch, FPWM_Freq, FPWM_Res);
   ledcAttachPin(FPIN_OUT, FPWM_Ch);
-  ledcWrite(FPWM_Ch,FPWM_DutyCycle);
+  ledcWrite(FPWM_Ch, FPWM_DutyCycle);
+
+  // Robot input
+  pinMode(robotIn, INPUT);
 }
 
 void loop() {
   // motor control
+  MotorEnable = digitalRead(robotIn);
   if (MotorEnable && MotorSpeed != 0) {
     currentMotorTime = millis();
     //Serial.print(currentMotorTime);
@@ -150,7 +158,7 @@ void loop() {
   if (sturnedCW) {
     svalue++;
     //MotorSpeed += MotorStep;
-    MotorSpeed = svalue*MotorStep;
+    MotorSpeed = svalue * MotorStep;
     //Serial.print("Turned CW: ");
     Serial.println(svalue);
     sturnedCW = false;
@@ -163,7 +171,7 @@ void loop() {
     if (!MotorSpeed <= 0) {
       svalue--;
       //MotorSpeed -= MotorStep;
-      MotorSpeed = svalue*MotorStep;
+      MotorSpeed = svalue * MotorStep;
     }
     //Serial.print("Turned CCW: ");
     Serial.println(svalue);
@@ -179,85 +187,92 @@ void loop() {
   }
 
   int sbtnState = (digitalRead(SPIN_BUTTON));
+  // Set MotorSpeed to Zero
   if (sbtnState == LOW) {
     if (millis() - slastButtonPress > DEBONCE_BTN) {
       if (!MotorSpeed == 0) {
+        // Turn off the motor speed
         MotorSpeed = 0;
-        //digitalWrite(OutFan, FanEnable);
+        // Ignore Robot's Motor Speed
+
         //Serial.print('\n');
       } else {
-         MotorSpeed =svalue*MotorStep ;
+        // Go back to previous motor speed
+        MotorSpeed = svalue * MotorStep;
+
       }
     }
     slastButtonPress = millis();
     OLED();
   }
 
-  // Fan Rotary encoder
 
-  if (fturnedCW) {
-    fvalue++;
-    if(fvalue>10){
-      fvalue =10;
-    }
-    FanSpeed = fvalue*FanStep;
-    // map(val, incoming_min, incoming_max, desired_min, desired_max);
-    Serial.println(FanSpeed);
-    FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
-    ledcWrite(FPWM_Ch, FPWM_DutyCycle);
-    Serial.println(fvalue);
-    fturnedCW = false;
-    flastWasCW = true;
-    flastWasCCW = false;
-    fdebounceTime = millis();
-    OLED();
+
+// Fan Rotary encoder
+
+if (fturnedCW) {
+  fvalue++;
+  if (fvalue > 10) {
+    fvalue = 10;
   }
+  FanSpeed = fvalue * FanStep;
+  // map(val, incoming_min, incoming_max, desired_min, desired_max);
+  Serial.println(FanSpeed);
+  FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
+  ledcWrite(FPWM_Ch, FPWM_DutyCycle);
+  Serial.println(fvalue);
+  fturnedCW = false;
+  flastWasCW = true;
+  flastWasCCW = false;
+  fdebounceTime = millis();
+  OLED();
+}
 
-  if (fturnedCCW) {
+if (fturnedCCW) {
+  if (!FanSpeed == 0) {
+    fvalue--;
+    //MotorSpeed -= MotorStep;
+    FanSpeed = fvalue * FanStep;
+  }
+  Serial.println(FanSpeed);
+  FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
+  ledcWrite(FPWM_Ch, FPWM_DutyCycle);
+  Serial.println(fvalue);
+  fturnedCCW = false;
+  flastWasCCW = true;
+  flastWasCW = false;
+  fdebounceTime = millis();
+  OLED();
+}
+
+if ((millis() - fdebounceTime) > DEBONCE_TO) {
+  flastWasCW = false;
+  flastWasCCW = false;
+}
+int fbtnState = (digitalRead(FPIN_BUTTON));
+if (fbtnState == LOW) {
+  if (millis() - flastButtonPress > DEBONCE_BTN) {
     if (!FanSpeed == 0) {
-      fvalue--;
-      //MotorSpeed -= MotorStep;
-      FanSpeed = fvalue*FanStep;
-    }
-    Serial.println(FanSpeed);
-    FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
-    ledcWrite(FPWM_Ch, FPWM_DutyCycle);
-    Serial.println(fvalue);
-    fturnedCCW = false;
-    flastWasCCW = true;
-    flastWasCW = false;
-    fdebounceTime = millis();
-    OLED();
-  }
-
-  if ((millis() - fdebounceTime) > DEBONCE_TO) {
-    flastWasCW = false;
-    flastWasCCW = false;
-  }
-  int fbtnState = (digitalRead(FPIN_BUTTON));
-  if (fbtnState == LOW) {
-    if (millis() - flastButtonPress > DEBONCE_BTN) {
-      if (!FanSpeed == 0) {
-        // Serial.println("Fan OFF");
-        // Serial.println(String(FanEnable));
-        FanSpeed = 0;
-        FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
+      // Serial.println("Fan OFF");
+      // Serial.println(String(FanEnable));
+      FanSpeed = 0;
+      FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
       ledcWrite(FPWM_Ch, FPWM_DutyCycle);
-        //digitalWrite(OutFan, FanEnable);
-        //Serial.print('\n');
-      } else {
-        // Serial.println("Fan ON");
-        // Serial.println(String(FanEnable));
-        FanSpeed = fvalue *FanStep;
-        FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
-        ledcWrite(FPWM_Ch, FPWM_DutyCycle);
-        //digitalWrite(OutFan, FanEnable);
-        //Serial.print('\n');
-      }
+      //digitalWrite(OutFan, FanEnable);
+      //Serial.print('\n');
+    } else {
+      // Serial.println("Fan ON");
+      // Serial.println(String(FanEnable));
+      FanSpeed = fvalue * FanStep;
+      FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
+      ledcWrite(FPWM_Ch, FPWM_DutyCycle);
+      //digitalWrite(OutFan, FanEnable);
+      //Serial.print('\n');
     }
-    flastButtonPress = millis();
-    OLED();
   }
+  flastButtonPress = millis();
+  OLED();
+}
 }
 
 void scheckEncoder() {
@@ -305,8 +320,8 @@ void OLED(void) {
   display.clearDisplay();
   display.setCursor(0, 0);
   display.println("Speed " + String(int(MotorSpeed)));
-  display.println("Fan " + String(int(FanSpeed))+ " %");
+  display.println("Fan " + String(int(FanSpeed)) + " %");
   // display.println("H " + String(HeaterEnable));
-  display.println(String(int(cTemp))+ "/" + String(int(cTemp))+" C");
+  display.println(String(int(cTemp)) + "/" + String(int(cTemp)) + " C");
   display.display();
 }
