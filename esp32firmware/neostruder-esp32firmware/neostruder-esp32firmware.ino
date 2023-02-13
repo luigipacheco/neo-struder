@@ -319,6 +319,7 @@ void OLED(void) {
   //cTemp = module.readCelsius();
   display.clearDisplay();
   display.setCursor(0, 0);
+  display.println("Motor " + String(bool(digitalRead(robotIn))));
   display.println("Speed " + String(int(MotorSpeed)));
   display.println("Fan " + String(int(FanSpeed)) + " %");
   // display.println("H " + String(HeaterEnable));
