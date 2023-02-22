@@ -17,9 +17,9 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define SPIN_BUTTON 15
 
 //Fan
-#define FPIN_A 5
-#define FPIN_B 18
-#define FPIN_BUTTON 19
+#define FPIN_A 18
+#define FPIN_B 19
+#define FPIN_BUTTON 5
 
 #define FPIN_OUT 14
 #define FPWM_Ch 1
