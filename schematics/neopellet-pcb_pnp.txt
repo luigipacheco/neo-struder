@@ -1,0 +1,33 @@
+*Pick And Place List
+*Company=
+*Author=
+*eMail=
+*
+*Project=neopellet-pcb
+*Date=14:20:03
+*CreatedBy=Fritzing 0.9.10b.2022-07-01.CD-2134-0-40d23c29
+*
+*
+*Coordinates in mm, always center of component
+*Origin 0/0=Lower left corner of PCB
+*Rotation in degree (0-360, math. pos.)
+*
+*No;Value;Package;X;Y;Rotation;Side;Name
+1;;THT;96.5692;-66.7838;180;Bottom;jumper4
+2;;;21.1184;-27.4215;-90;Bottom;Part1
+3;;THT;88.9492;-59.1638;180;Bottom;jumper
+4;;THT;96.5692;-3.2838;180;Bottom;jumper5
+5;;THT;71.1692;-59.1638;180;Bottom;jumper3
+6;;THT;68.5092;-57.1738;180;Bottom;RE3
+7;;THT;24.1792;-41.3838;-90;Bottom;robot1
+8;;THT;2.58916;-66.7838;180;Bottom;jumper7
+9;;THT;78.7892;-59.1638;180;Bottom;jumper1
+10;;THT;2.58916;-3.2838;180;Bottom;jumper6
+11;;THT;78.7892;-8.3638;180;Bottom;tempOut
+12;;;73.8574;-31.2686;-90;Bottom;M1
+13;;THT;43.2292;-29.9538;0;Bottom;ExtruderMotor
+14;;THT;48.1892;-57.1738;180;Bottom;temp
+15;;THT;83.8692;-8.3638;180;Bottom;fan
+16;;THT;88.8291;-57.1738;180;Bottom;fan
+17;;THT;58.4692;-59.1638;180;Bottom;jumper2
+18;;THT;73.7092;-8.3638;180;Bottom;robot
