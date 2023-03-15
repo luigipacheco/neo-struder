@@ -17,16 +17,17 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define SPIN_BUTTON 15
 
 //Fan
-#define FPIN_A 18
-#define FPIN_B 19
-#define FPIN_BUTTON 5
+#define FPIN_A 17
+#define FPIN_B 5
+#define FPIN_BUTTON 16
 
+// Fan pwm out
 #define FPIN_OUT 14
 #define FPWM_Ch 1
 #define FPWM_Res 8
 #define FPWM_Freq 250000  //1000 or 250 000
 
-#define robotIn 33  // start/stop extruder
+#define robotIn 12  // start/stop extruder
 
 int FPWM_DutyCycle = 0;
 
