@@ -4,6 +4,8 @@
 #include <Adafruit_SSD1306.h>
 #include <max6675.h>
 #include <ezOutput.h>
+#include <PID_v1.h>
+
 
 // Display variables///
 #define SCREEN_WIDTH 128  // OLED display width, in pixels
@@ -11,15 +13,20 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // Rotary encoder variables
-//Motor
+//Motor encoder
 #define SPIN_A 2
 #define SPIN_B 4
 #define SPIN_BUTTON 15
 
-//Fan
+//Fan encoder
 #define FPIN_A 17
 #define FPIN_B 5
 #define FPIN_BUTTON 16
+
+//temp encoder
+#define TPIN_A 3
+#define TPIN_B 22
+#define TPIN_BUTTON 19
 
 // Fan pwm out
 #define FPIN_OUT 14
@@ -30,11 +37,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define robotIn 12  // start/stop extruder
 
 int FPWM_DutyCycle = 0;
-
-//Temperature
-//#define TPIN_A      2
-//#define TPIN_B      4
-//#define TPIN_BUTTON 15
 
 static int svalue = 0;
 static int fvalue = 0;
@@ -60,19 +62,23 @@ bool flastWasCW = false;
 bool flastWasCCW = false;
 
 //// Heater Variables ////
-int OutHeater = 3;
+double Output;
+const unsigned long WindowSize = 5000;
+unsigned long windowStartTime;
+int OutHeater = 13;
 int OutFan = 6;
 bool HeaterEnable = false;
 bool FanEnable = false;
 int FanSpeed = 0;
 int FanStep = 10;
-float cTemp = 0;
-float sTemp = 200;
+double curTemp = 0;
+double tarTemp = 200;
 unsigned long LastReadTime = 0;
-int SO = 12;
-int CS = 10;
-int sck = 13;
-//MAX6675 module(sck, CS, SO);
+int SO = 33;
+int CS = 32;
+int sck = 35;
+PID myPID(&curTemp, &Output, &tarTemp, 2, 5, 1, DIRECT);
+MAX6675 module(sck, CS, SO);
 
 //motor variables
 int OutStep = 25;
@@ -104,6 +110,7 @@ void setup() {
   // Display static text
   OLED();
   Serial.println("OLED setup OK");
+
   //// MOTOR setup////
   pinMode(OutDir, OUTPUT);
   pinMode(OutStep, OUTPUT);
@@ -137,6 +144,16 @@ void setup() {
 
   // Robot input
   pinMode(robotIn, INPUT);
+
+  //PID control
+  pinMode(OutHeater, OUTPUT);
+  windowStartTime = millis();
+
+  // Tell the PID to range between 0 and the full window size
+  myPID.SetOutputLimits(0, WindowSize);
+
+  // Turn the PID on
+  myPID.SetMode(AUTOMATIC);
 }
 
 void loop() {
@@ -153,6 +170,34 @@ void loop() {
     digitalWrite(OutStep, false);
     delayMicroseconds(MillisPerStep);
   }
+    // HEATER Controller with PID control only if HeaterEnable is true
+    if (HeaterEnable) {
+        curTemp = module.readCelsius();  // Update the current temperature from the module
+        OLED();  // I kept your OLED update here
+        Serial.println(curTemp);
+
+        myPID.Compute();
+
+        /************************************************
+        turn the output pin on/off based on pid output
+        ************************************************/
+        unsigned long now = millis();
+        if (now - windowStartTime > WindowSize) {
+            // Time to shift the Relay Window
+            windowStartTime += WindowSize;
+        }
+        if (Output > now - windowStartTime) {
+            digitalWrite(OutHeater, HIGH);
+            Serial.println("heater on");
+        } else {
+            digitalWrite(OutHeater, LOW);
+            Serial.println("heater off");
+        }
+    } 
+    else {
+        digitalWrite(OutHeater, LOW);
+        Serial.println("heater off due to HeaterEnable being false");
+    }
 
   // motor Rotary encoder
 
@@ -232,7 +277,6 @@ if (fturnedCW) {
 if (fturnedCCW) {
   if (!FanSpeed == 0) {
     fvalue--;
-    //MotorSpeed -= MotorStep;
     FanSpeed = fvalue * FanStep;
   }
   Serial.println(FanSpeed);
@@ -316,6 +360,8 @@ void fcheckEncoder() {
     }
   }
 }
+
+
 void OLED(void) {
   //cTemp = module.readCelsius();
   display.clearDisplay();
@@ -324,6 +370,6 @@ void OLED(void) {
   display.println("Speed " + String(int(MotorSpeed)));
   display.println("Fan " + String(int(FanSpeed)) + " %");
   // display.println("H " + String(HeaterEnable));
-  display.println(String(int(cTemp)) + "/" + String(int(cTemp)) + " C");
+  display.println(String(int(curTemp)) + "/" + String(int(tarTemp)) + " C");
   display.display();
 }

@@ -4,6 +4,8 @@
 #include <Adafruit_SSD1306.h>
 #include "max6675.h"
 #include <ezOutput.h>
+#include <PID_v1.h>
+
 
 // Display variables///
 #define SCREEN_WIDTH 128  // OLED display width, in pixels
@@ -25,12 +27,16 @@ unsigned long previousMotorTime = 0;
 long motorInterval = 0.1;
 
 //// Heater Variables ////
+double Setpoint, Input, Output;
+PID myPID(&Input, &Output, &Setpoint, 2, 5, 1, DIRECT);
+const unsigned long WindowSize = 5000;
+unsigned long windowStartTime;
 int OutHeater = 3;
 int OutFan = 6;
 bool HeaterEnable = false;
 bool FanEnable = false;
-float cTemp = 0;
-float sTemp = 200;
+float curTemp = 0;
+float tarTemp = 200;
 unsigned long LastReadTime = 0;
 int SO = 12;
 int CS = 10;
@@ -100,22 +106,6 @@ void loop() {
   digitalWrite(OutFan, FanEnable);
 
   // MOTOR Controller
-  // int timeElapsed = millis() - LastRunTime;
-  // LastRunTime = millis();
-  // if (MotorEnable && MotorSpeed != 0) {
-  //   float StepPerMillis = MotorRev * MotorSpeed / 60000;  //400 step per rev * 10 rev per minute / 60 000 = 0.0666 per milisec = 66.6 per sec = 4000 per minute
-  //   Serial.println(StepPerMillis);
-  //   float MillisPerStep = 1 / StepPerMillis;              // 0.0666 step per milisec = 66.6 per sec = 4000 per minute
-  //   Serial.println(MillisPerStep);
-
-  //   for (int steps = 0; steps <= timeElapsed / (MillisPerStep + 1); steps++) {
-  //     digitalWrite(OutStep, HIGH);
-  //     delayMicroseconds(MillisPerStep * 1000 / 2);
-  //     digitalWrite(OutStep, LOW);
-  //     delayMicroseconds(MillisPerStep * 1000 / 2);
-  //   }
-  // }
-// better control
 if (MotorEnable && MotorSpeed != 0) {
   currentMotorTime = millis();
   Serial.print(currentMotorTime);
@@ -147,6 +137,34 @@ if (MotorEnable && MotorSpeed != 0) {
   //     Serial.println("heater off");
   //   }
   // }
+
+    // HEATER Controller with PID control only if HeaterEnable is true
+    if (HeaterEnable) {
+        Input = module.readCelsius();
+        OLED();  // I kept your OLED update here
+        Serial.println(Input);
+
+        myPID.Compute();
+
+        /************************************************
+        turn the output pin on/off based on pid output
+        ************************************************/
+        unsigned long now = millis();
+        if (now - windowStartTime > WindowSize) {
+            // Time to shift the Relay Window
+            windowStartTime += WindowSize;
+        }
+        if (Output > now - windowStartTime) {
+            digitalWrite(OutHeater, HIGH);
+            Serial.println("heater on");
+        } else {
+            digitalWrite(OutHeater, LOW);
+            Serial.println("heater off");
+        }
+    } else {
+        digitalWrite(OutHeater, LOW);
+        Serial.println("heater off due to HeaterEnable being false");
+    }
 
   // Encoder and button
   aState = digitalRead(clk);  // Reads the "current" state of the outputA
@@ -192,13 +210,11 @@ if (MotorEnable && MotorSpeed != 0) {
 }
 
 void OLED(void) {
-  cTemp = module.readCelsius();
+  curTemp = module.readCelsius();
   display.clearDisplay();
   display.setCursor(0, 0);
   display.println("Speed " + String(int(MotorSpeed)));
   display.println("Fan " + String(FanEnable));
-  // display.println("H " + String(HeaterEnable));
-  // display.println("T " + String(cTemp));
+  display.println("T " + String(curTemp) + " / " +String(tarTemp) );
   display.display();
-  return true;
 }
