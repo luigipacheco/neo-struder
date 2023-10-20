@@ -2,7 +2,8 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-#include <max6675.h>
+#include <SPI.h>
+#include "Adafruit_MAX31855.h"
 #include <ezOutput.h>
 #include <PID_v1.h>
 
@@ -79,13 +80,14 @@ bool FanEnable = false;
 int FanSpeed = 0;
 int FanStep = 10;
 double curTemp = 0;
-double tarTemp = 200;
+double tarTemp = 0;
 unsigned long LastReadTime = 0;
 int SO = 33;
 int CS = 32;
-int sck = 35;
+int clk = 35;
 PID myPID(&curTemp, &Output, &tarTemp, 2, 5, 1, DIRECT);
-MAX6675 module(sck, CS, SO);
+Adafruit_MAX31855 thermocouple(clk, CS, SO);
+
 
 //motor variables
 int OutStep = 25;
@@ -116,7 +118,13 @@ void setup() {
   display.setCursor(0, 0);
   // Display static text
   OLED();
-  Serial.println("OLED setup OK");
+
+  // Setup thermocouple
+  Serial.print("Initializing sensor...");
+  if (!thermocouple.begin()) {
+    Serial.println("ERROR.");
+    while (1) delay(10);
+  }
 
   //// MOTOR setup////
   pinMode(OutDir, OUTPUT);
@@ -135,21 +143,21 @@ void setup() {
   pinMode(SPIN_B, INPUT_PULLUP);
   pinMode(SPIN_BUTTON, INPUT_PULLUP);
   attachInterrupt(SPIN_B, scheckEncoder, CHANGE);
-  Serial.println("Reading from encoder: ");
+  Serial.println("Reading from encoder: MOTOR ");
 
   //Fan Encoder setup
   pinMode(FPIN_A, INPUT_PULLUP);
   pinMode(FPIN_B, INPUT_PULLUP);
   pinMode(FPIN_BUTTON, INPUT_PULLUP);
   attachInterrupt(FPIN_B, fcheckEncoder, CHANGE);
-  Serial.println("Reading from encoder: ");
+  Serial.println("Reading from encoder: FAN ");
 
   //Temp  Encoder setup
   pinMode(TPIN_A, INPUT_PULLUP);
   pinMode(TPIN_B, INPUT_PULLUP);
   pinMode(TPIN_BUTTON, INPUT_PULLUP);
   attachInterrupt(TPIN_B, tcheckEncoder, CHANGE);
-  Serial.println("Reading from encoder: ");
+  Serial.println("Reading from encoder: TEMP ");
 
   // Fan PWM output
   ledcSetup(FPWM_Ch, FPWM_Freq, FPWM_Res);
@@ -168,11 +176,24 @@ void setup() {
 
   // Turn the PID on
   myPID.SetMode(AUTOMATIC);
+  curTemp = thermocouple.readCelsius();
+  if (isnan(curTemp)) {
+     Serial.println("Thermocouple fault(s) detected!");
+     uint8_t e = thermocouple.readError();
+     if (e & MAX31855_FAULT_OPEN) Serial.println("FAULT: Thermocouple is open - no connections.");
+     if (e & MAX31855_FAULT_SHORT_GND) Serial.println("FAULT: Thermocouple is short-circuited to GND.");
+     if (e & MAX31855_FAULT_SHORT_VCC) Serial.println("FAULT: Thermocouple is short-circuited to VCC.");
+   } else {
+     Serial.print("C = ");
+     Serial.println(curTemp);
+   }
+
 }
 
 void loop() {
   // motor control
   MotorEnable = digitalRead(robotIn);
+  
   if (MotorEnable && MotorSpeed != 0) {
     currentMotorTime = millis();
     //Serial.print(currentMotorTime);
@@ -184,11 +205,12 @@ void loop() {
     digitalWrite(OutStep, false);
     delayMicroseconds(MillisPerStep);
   }
+    curTemp = thermocouple.readCelsius();
     // HEATER Controller with PID control only if HeaterEnable is true
     if (HeaterEnable) {
-        curTemp = module.readCelsius();  // Update the current temperature from the module
+        curTemp = thermocouple.readCelsius();  // Update the current temperature from the module
         OLED();  // I kept your OLED update here
-        Serial.println(curTemp);
+        //Serial.println(curTemp);
 
         myPID.Compute();
 
@@ -202,15 +224,15 @@ void loop() {
         }
         if (Output > now - windowStartTime) {
             digitalWrite(OutHeater, HIGH);
-            Serial.println("heater on");
+            //Serial.println("heater on");
         } else {
             digitalWrite(OutHeater, LOW);
-            Serial.println("heater off");
+            //Serial.println("heater off");
         }
     } 
     else {
         digitalWrite(OutHeater, LOW);
-        Serial.println("heater off due to HeaterEnable being false");
+        //Serial.println("heater off due to HeaterEnable being false");
     }
 
   // motor Rotary encoder
@@ -220,7 +242,7 @@ void loop() {
     //MotorSpeed += MotorStep;
     MotorSpeed = svalue * MotorStep;
     //Serial.print("Turned CW: ");
-    Serial.println(svalue);
+    //Serial.println(svalue);
     sturnedCW = false;
     slastWasCW = true;
     sdebounceTime = millis();
@@ -234,7 +256,7 @@ void loop() {
       MotorSpeed = svalue * MotorStep;
     }
     //Serial.print("Turned CCW: ");
-    Serial.println(svalue);
+    //Serial.println(svalue);
     sturnedCCW = false;
     slastWasCCW = true;
     sdebounceTime = millis();
@@ -272,7 +294,7 @@ void loop() {
     tvalue++;
     tarTemp = tvalue * 5;  // Adjusting in 5-degree increments
     //Serial.print("Turned CW: ");
-    Serial.println(tvalue);
+    //Serial.println(tvalue);
     tturnedCW = false;
     tlastWasCW = true;
     tdebounceTime = millis();
@@ -285,7 +307,7 @@ void loop() {
       tarTemp = tvalue * 5;  // Adjusting in 5-degree increments
     }
     //Serial.print("Turned CCW: ");
-    Serial.println(tvalue);
+    //Serial.println(tvalue);
     tturnedCCW = false;
     tlastWasCCW = true;
     tdebounceTime = millis();
@@ -303,9 +325,11 @@ void loop() {
     if (millis() - tlastButtonPress > DEBONCE_BTN) {
       if (tarTemp != 0) {  // Resetting the tarTemp
         tarTemp = 0;
+        HeaterEnable = false;
       } else {
         // Go back to previous temperature
         tarTemp = tvalue * 5; 
+        HeaterEnable = true;
 
       }
     }
@@ -322,10 +346,10 @@ if (fturnedCW) {
   }
   FanSpeed = fvalue * FanStep;
   // map(val, incoming_min, incoming_max, desired_min, desired_max);
-  Serial.println(FanSpeed);
+  //Serial.println(FanSpeed);
   FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
   ledcWrite(FPWM_Ch, FPWM_DutyCycle);
-  Serial.println(fvalue);
+  //Serial.println(fvalue);
   fturnedCW = false;
   flastWasCW = true;
   flastWasCCW = false;
@@ -338,10 +362,10 @@ if (fturnedCCW) {
     fvalue--;
     FanSpeed = fvalue * FanStep;
   }
-  Serial.println(FanSpeed);
+  //Serial.println(FanSpeed);
   FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
   ledcWrite(FPWM_Ch, FPWM_DutyCycle);
-  Serial.println(fvalue);
+  //Serial.println(fvalue);
   fturnedCCW = false;
   flastWasCCW = true;
   flastWasCW = false;
