@@ -24,9 +24,9 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define FPIN_BUTTON 16
 
 //temp encoder
-#define TPIN_A 3
-#define TPIN_B 22
-#define TPIN_BUTTON 19
+#define TPIN_A 19
+#define TPIN_B 3
+#define TPIN_BUTTON 18
 
 // Fan pwm out
 #define FPIN_OUT 14
@@ -40,14 +40,15 @@ int FPWM_DutyCycle = 0;
 
 static int svalue = 0;
 static int fvalue = 0;
+static int tvalue = 0;
 int DEBONCE_TO = 150;
 int DEBONCE_BTN = 200;
 volatile bool sturnedCW = false;
 volatile bool sturnedCCW = false;
 volatile bool fturnedCW = false;
 volatile bool fturnedCCW = false;
-// volatile bool turnedCW = false;
-// volatile bool turnedCCW = false;
+volatile bool tturnedCW = false;
+volatile bool tturnedCCW = false;
 
 unsigned long slastButtonPress = 0;
 unsigned long sdebounceTime = 0;
@@ -55,11 +56,17 @@ unsigned long sdebounceTime = 0;
 unsigned long flastButtonPress = 0;
 unsigned long fdebounceTime = 0;
 
+unsigned long tlastButtonPress = 0;
+unsigned long tdebounceTime = 0;
+
 bool slastWasCW = false;
 bool slastWasCCW = false;
 
 bool flastWasCW = false;
 bool flastWasCCW = false;
+
+bool tlastWasCW = false;
+bool tlastWasCCW = false;
 
 //// Heater Variables ////
 double Output;
@@ -135,6 +142,13 @@ void setup() {
   pinMode(FPIN_B, INPUT_PULLUP);
   pinMode(FPIN_BUTTON, INPUT_PULLUP);
   attachInterrupt(FPIN_B, fcheckEncoder, CHANGE);
+  Serial.println("Reading from encoder: ");
+
+  //Temp  Encoder setup
+  pinMode(TPIN_A, INPUT_PULLUP);
+  pinMode(TPIN_B, INPUT_PULLUP);
+  pinMode(TPIN_BUTTON, INPUT_PULLUP);
+  attachInterrupt(TPIN_B, tcheckEncoder, CHANGE);
   Serial.println("Reading from encoder: ");
 
   // Fan PWM output
@@ -252,7 +266,52 @@ void loop() {
     OLED();
   }
 
+//Temperature rotary encoder
 
+ if (tturnedCW) {
+    tvalue++;
+    tarTemp = tvalue * 5;  // Adjusting in 5-degree increments
+    //Serial.print("Turned CW: ");
+    Serial.println(tvalue);
+    tturnedCW = false;
+    tlastWasCW = true;
+    tdebounceTime = millis();
+    OLED();
+  }
+
+  if (tturnedCCW) {
+    if (tarTemp > 0) {   // Assuming temperature cannot go below 0.
+      tvalue--;
+      tarTemp = tvalue * 5;  // Adjusting in 5-degree increments
+    }
+    //Serial.print("Turned CCW: ");
+    Serial.println(tvalue);
+    tturnedCCW = false;
+    tlastWasCCW = true;
+    tdebounceTime = millis();
+    OLED();
+  }
+
+  if ((millis() - tdebounceTime) > DEBONCE_TO) {
+    tlastWasCW = false;
+    tlastWasCCW = false;
+  }
+
+  int tbtnState = (digitalRead(TPIN_BUTTON));  // Assuming you have TEMP_BUTTON for temperature control
+  // Set tarTemp to Default/Initial Value
+  if (tbtnState == LOW) {
+    if (millis() - tlastButtonPress > DEBONCE_BTN) {
+      if (tarTemp != 0) {  // Resetting the tarTemp
+        tarTemp = 0;
+      } else {
+        // Go back to previous temperature
+        tarTemp = tvalue * 5; 
+
+      }
+    }
+    tlastButtonPress = millis();
+    OLED();
+  }
 
 // Fan Rotary encoder
 
@@ -336,6 +395,26 @@ void scheckEncoder() {
         sturnedCCW = true;
       } else {
         sturnedCW = true;
+      }
+    }
+  }
+}
+void tcheckEncoder() {
+  if ((!tturnedCW) && (!tturnedCCW)) {
+    int tpinA = digitalRead(TPIN_A);
+    delayMicroseconds(1500);
+    int tpinB = digitalRead(TPIN_B);
+    if (tpinA == tpinB) {
+      if (tlastWasCW) {
+        tturnedCW = true;
+      } else {
+        tturnedCCW = true;
+      }
+    } else {
+      if (tlastWasCCW) {
+        tturnedCCW = true;
+      } else {
+        tturnedCW = true;
       }
     }
   }
