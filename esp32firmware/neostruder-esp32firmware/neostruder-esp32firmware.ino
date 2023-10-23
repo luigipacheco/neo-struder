@@ -212,7 +212,7 @@ void loop() {
     digitalWrite(OutStep, false);
     delayMicroseconds(MillisPerStep);
   }
-    double curTemp = thermocouple.readCelsius();
+    curTemp = thermocouple.readCelsius();
     OLED();  // I kept your OLED update here
 
     // HEATER Controller with PID control only if HeaterEnable is true
