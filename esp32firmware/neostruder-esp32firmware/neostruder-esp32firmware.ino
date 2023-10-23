@@ -82,11 +82,11 @@ int FanStep = 10;
 double curTemp = 0;
 double tarTemp = 0;
 unsigned long LastReadTime = 0;
-int SO = 33;
-int CS = 32;
-int clk = 35;
+#define MAXDO   35
+#define MAXCS   33
+#define MAXCLK  32
 PID myPID(&curTemp, &Output, &tarTemp, 2, 5, 1, DIRECT);
-Adafruit_MAX31855 thermocouple(clk, CS, SO);
+Adafruit_MAX31855 thermocouple(MAXCLK, MAXCS, MAXDO);
 
 
 //motor variables
@@ -120,11 +120,18 @@ void setup() {
   OLED();
 
   // Setup thermocouple
+   while (!Serial) delay(1); // wait for Serial on Leonardo/Zero, etc
+
+  Serial.println("MAX31855 test");
+  // wait for MAX chip to stabilize
+  delay(500);
   Serial.print("Initializing sensor...");
   if (!thermocouple.begin()) {
     Serial.println("ERROR.");
     while (1) delay(10);
   }
+    Serial.println("SENSOR DONE.");
+
 
   //// MOTOR setup////
   pinMode(OutDir, OUTPUT);
@@ -176,7 +183,7 @@ void setup() {
 
   // Turn the PID on
   myPID.SetMode(AUTOMATIC);
-  curTemp = thermocouple.readCelsius();
+  double curTemp = thermocouple.readCelsius();
   if (isnan(curTemp)) {
      Serial.println("Thermocouple fault(s) detected!");
      uint8_t e = thermocouple.readError();
@@ -205,12 +212,12 @@ void loop() {
     digitalWrite(OutStep, false);
     delayMicroseconds(MillisPerStep);
   }
-    curTemp = thermocouple.readCelsius();
+    double curTemp = thermocouple.readCelsius();
+    OLED();  // I kept your OLED update here
+
     // HEATER Controller with PID control only if HeaterEnable is true
     if (HeaterEnable) {
-        curTemp = thermocouple.readCelsius();  // Update the current temperature from the module
-        OLED();  // I kept your OLED update here
-        //Serial.println(curTemp);
+
 
         myPID.Compute();
 
