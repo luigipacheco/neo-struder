@@ -3,7 +3,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <SPI.h>
-#include "Adafruit_MAX31855.h"
+#include "Adafruit_MAX31856.h"
 #include <ezOutput.h>
 #include <PID_v1.h>
 
@@ -35,7 +35,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define FPWM_Res 8
 #define FPWM_Freq 250000  //1000 or 250 000
 
-#define robotIn 12  // start/stop extruder
+//#define robotIn 12  // start/stop extruder
 
 int FPWM_DutyCycle = 0;
 
@@ -73,7 +73,7 @@ bool tlastWasCCW = false;
 double Output;
 const unsigned long WindowSize = 5000;
 unsigned long windowStartTime;
-int OutHeater = 13;
+int OutHeater = 12;
 int OutFan = 6;
 bool HeaterEnable = false;
 bool FanEnable = false;
@@ -82,11 +82,15 @@ int FanStep = 10;
 double curTemp = 0;
 double tarTemp = 0;
 unsigned long LastReadTime = 0;
+
+#define MAXDRDY 34
 #define MAXDO   35
 #define MAXCS   33
 #define MAXCLK  32
+#define MAXDI   13
 PID myPID(&curTemp, &Output, &tarTemp, 2, 5, 1, DIRECT);
-Adafruit_MAX31855 thermocouple(MAXCLK, MAXCS, MAXDO);
+// Use software SPI: CS, DI, DO, CLK
+Adafruit_MAX31856 thermocouple = Adafruit_MAX31856(MAXCS, MAXDI, MAXDO, MAXCLK);
 
 
 //motor variables
@@ -122,15 +126,16 @@ void setup() {
   // Setup thermocouple
    while (!Serial) delay(1); // wait for Serial on Leonardo/Zero, etc
 
-  Serial.println("MAX31855 test");
+  Serial.println("MAX31856 test");
   // wait for MAX chip to stabilize
   delay(500);
-  Serial.print("Initializing sensor...");
+  Serial.println("Initializing sensor...");
   if (!thermocouple.begin()) {
     Serial.println("ERROR.");
     while (1) delay(10);
   }
     Serial.println("SENSOR DONE.");
+    pinMode(MAXDRDY, INPUT);
 
 
   //// MOTOR setup////
@@ -172,7 +177,7 @@ void setup() {
   ledcWrite(FPWM_Ch, FPWM_DutyCycle);
 
   // Robot input
-  pinMode(robotIn, INPUT);
+  //pinMode(robotIn, INPUT);
 
   //PID control
   pinMode(OutHeater, OUTPUT);
@@ -183,24 +188,35 @@ void setup() {
 
   // Turn the PID on
   myPID.SetMode(AUTOMATIC);
-  double curTemp = thermocouple.readCelsius();
-  if (isnan(curTemp)) {
-     Serial.println("Thermocouple fault(s) detected!");
-     uint8_t e = thermocouple.readError();
-     if (e & MAX31855_FAULT_OPEN) Serial.println("FAULT: Thermocouple is open - no connections.");
-     if (e & MAX31855_FAULT_SHORT_GND) Serial.println("FAULT: Thermocouple is short-circuited to GND.");
-     if (e & MAX31855_FAULT_SHORT_VCC) Serial.println("FAULT: Thermocouple is short-circuited to VCC.");
-   } else {
-     Serial.print("C = ");
-     Serial.println(curTemp);
-   }
 
+  if (!thermocouple.begin()) {
+    Serial.println("Could not initialize thermocouple.");
+    while (1) delay(10);
+  }
+  thermocouple.setThermocoupleType(MAX31856_TCTYPE_K);
+  thermocouple.setConversionMode(MAX31856_CONTINUOUS);
+  // thermocouple.triggerOneShot();
+  // delay(500);
+  if (thermocouple.conversionComplete()) {
+    curTemp = thermocouple.readThermocoupleTemperature();
+    Serial.println(curTemp);
+  } 
+  else {
+    Serial.println("Conversion not complete!");
+  }
 }
 
 void loop() {
   // motor control
-  MotorEnable = digitalRead(robotIn);
-  
+  MotorEnable = digitalRead(true);
+  // if (!digitalRead(MAXDRDY)) {
+  //   curTemp = thermocouple.readThermocoupleTemperature();
+  // Serial.println(curTemp);
+  // }
+  // if (thermocouple.conversionComplete()) {
+  //   curTemp = thermocouple.readThermocoupleTemperature();
+  //   Serial.println(curTemp);
+  // } 
   if (MotorEnable && MotorSpeed != 0) {
     currentMotorTime = millis();
     //Serial.print(currentMotorTime);
@@ -212,13 +228,18 @@ void loop() {
     digitalWrite(OutStep, false);
     delayMicroseconds(MillisPerStep);
   }
-    curTemp = thermocouple.readCelsius();
-    OLED();  // I kept your OLED update here
+    // thermocouple.triggerOneShot();
+    // if (thermocouple.conversionComplete()) {
+    //   curTemp = thermocouple.readThermocoupleTemperature();
+    //   Serial.println(curTemp);
+    // } 
+    // else {
+    //   Serial.println("Conversion not complete!");
+    // }
+    //OLED();  // I kept your OLED update here
 
     // HEATER Controller with PID control only if HeaterEnable is true
     if (HeaterEnable) {
-
-
         myPID.Compute();
 
         /************************************************
@@ -476,7 +497,7 @@ void OLED(void) {
   //cTemp = module.readCelsius();
   display.clearDisplay();
   display.setCursor(0, 0);
-  display.println("Motor " + String(bool(digitalRead(robotIn))));
+  //display.println("Motor " + String(bool(digitalRead(robotIn))));
   display.println("Speed " + String(int(MotorSpeed)));
   display.println("Fan " + String(int(FanSpeed)) + " %");
   // display.println("H " + String(HeaterEnable));
