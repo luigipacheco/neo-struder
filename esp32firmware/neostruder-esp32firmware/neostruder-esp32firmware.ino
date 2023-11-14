@@ -6,6 +6,10 @@
 #include "Adafruit_MAX31856.h"
 #include <ezOutput.h>
 #include <PID_v1.h>
+#include "WiFi.h"
+#include <WiFiUdp.h>
+#include <OSCMessage.h>
+#include <OSCBundle.h>
 
 
 // Display variables///
@@ -34,11 +38,11 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define FPWM_Ch 1
 #define FPWM_Res 8
 #define FPWM_Freq 250000  //1000 or 250 000
-
+int FPWM_DutyCycle = 0;
 //#define robotIn 12  // start/stop extruder
 
-int FPWM_DutyCycle = 0;
 
+// Global Variables for Encoder State
 static int svalue = 0;
 static int fvalue = 0;
 static int tvalue = 0;
@@ -70,6 +74,7 @@ bool tlastWasCW = false;
 bool tlastWasCCW = false;
 
 //// Heater Variables ////
+bool enable = false;
 double Output;
 const unsigned long WindowSize = 5000;
 unsigned long windowStartTime;
@@ -108,9 +113,40 @@ long motorInterval = 0.1;
 
 bool ignoreRobotMotorSpeed = false;
 
+// network variables:
+WiFiUDP udp;
+int port = 55555;
+
+
+const char* ssid = "RDF_Rapture";
+const char* password = "WiFi4RDF*!";
+// Set your Static IP address
+IPAddress static_IP(192, 168, 1, 222);
+IPAddress gateway(192, 168, 1, 1);
+IPAddress subnet(255, 255, 255, 0);
 
 void setup() {
   Serial.begin(115200);
+
+  // Wifi Setup
+  if (!WiFi.config(static_IP, gateway, subnet)) {
+    Serial.println("STA Failed to configure");
+  }
+
+  // Connect to the wifi router's network
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi..");
+  }
+
+  // Confirm the Static Address
+  Serial.print("ESP32_0 IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  // Begin listening on the UDP port
+  udp.begin(port);
+
   ///Oled setup
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {  // Address 0x3D for 128x64
     Serial.println(F("SSD1306 allocation failed"));
@@ -207,6 +243,8 @@ void setup() {
 }
 
 void loop() {
+  //Check for UDP changes
+  check_for_OSC_message();
   // motor control
   MotorEnable = digitalRead(true);
   // if (!digitalRead(MAXDRDY)) {
@@ -491,8 +529,6 @@ void fcheckEncoder() {
     }
   }
 }
-
-
 void OLED(void) {
   //cTemp = module.readCelsius();
   display.clearDisplay();
@@ -503,4 +539,55 @@ void OLED(void) {
   // display.println("H " + String(HeaterEnable));
   display.println(String(int(curTemp)) + "/" + String(int(tarTemp)) + " C");
   display.display();
+}
+void on_message_received(OSCMessage& msg) {
+  // Get the LED index from the message address
+  // Get the message address
+  char msg_addr[255];
+  msg.getAddress(msg_addr);
+  Serial.println(msg_addr);
+  String addr = "";
+  addr += msg_addr;
+
+  if (addr == "/MotorSpeed") {
+    MotorSpeed = msg.getInt(0);
+    Serial.println(MotorSpeed);
+  } 
+
+  else if (addr == "/FanSpeed") {
+    FanSpeed = msg.getInt(0);
+    Serial.println(FanSpeed);
+  }
+
+  else if (addr == "/tarTemp") {
+    tarTemp = msg.getInt(0);
+    Serial.println(tarTemp);
+  }
+
+  // else if (addr == "/enable") {
+  //   enable = msg.getBool(0);
+  //   Serial.println(enable);
+  // }
+  OLED();
+}
+
+void check_for_OSC_message() {
+  OSCMessage msg;
+  int size = udp.parsePacket();
+  if (size > 0) {
+    while (size--) {
+      msg.fill(udp.read());
+    }
+    if (!msg.hasError()) {
+      // Get the message address
+      char msg_addr[255];
+      msg.getAddress(msg_addr);
+      Serial.print("MSG_ADDR: ");
+      Serial.println(msg_addr);
+
+      // if (!msg.isBundle()) {
+      msg.dispatch(msg_addr, on_message_received);
+
+    }
+  }
 }
