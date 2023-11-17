@@ -413,8 +413,7 @@ if (fturnedCW) {
   FanSpeed = fvalue * FanStep;
   // map(val, incoming_min, incoming_max, desired_min, desired_max);
   //Serial.println(FanSpeed);
-  FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
-  ledcWrite(FPWM_Ch, FPWM_DutyCycle);
+  updateFan();
   //Serial.println(fvalue);
   fturnedCW = false;
   flastWasCW = true;
@@ -429,8 +428,7 @@ if (fturnedCCW) {
     FanSpeed = fvalue * FanStep;
   }
   //Serial.println(FanSpeed);
-  FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
-  ledcWrite(FPWM_Ch, FPWM_DutyCycle);
+  updateFan();
   //Serial.println(fvalue);
   fturnedCCW = false;
   flastWasCCW = true;
@@ -529,6 +527,10 @@ void fcheckEncoder() {
     }
   }
 }
+void updateFan(void){
+    FPWM_DutyCycle = map(FanSpeed, 0, 100, 0, 255);
+    ledcWrite(FPWM_Ch, FPWM_DutyCycle);
+}
 void OLED(void) {
   //cTemp = module.readCelsius();
   display.clearDisplay();
@@ -556,6 +558,7 @@ void on_message_received(OSCMessage& msg) {
 
   else if (addr == "/FanSpeed") {
     FanSpeed = msg.getInt(0);
+    updateFan();
     Serial.println(FanSpeed);
   }
 
