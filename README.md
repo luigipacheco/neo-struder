@@ -17,6 +17,4 @@ files and firmware to make a plastic pellet (or more) extruder from a microcontr
 Copyright by Luis Pacheco
 
 ### license:
-
-- Firmware GPL
-- Hardware and models CC BY NC SA
+- Software Hardware and models CC BY NC SA
