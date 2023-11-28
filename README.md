@@ -3,20 +3,18 @@ files and firmware to make a plastic pellet (or more) extruder from a microcontr
 
 ### features:
 - motor control (Speed)
-- temperature control
+- temperature control **
 - fan control
-- i/o for robot comms
 - OLED menu
-- Serial control and debug
+- Serial  debug
+- OSC control
+- TouchOSC interface
 
 ### to do
-- ESP32 based
-- Web UI
-- ...
+- Temperature control (test)
+- Smart Knob
 
 Copyright by Luis Pacheco
 
 ### license:
-
-- Firmware GPL
-- Hardware and models CC BY NC SA
+- Software Hardware and models CC BY NC SA
