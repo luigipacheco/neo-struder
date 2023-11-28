@@ -121,7 +121,7 @@ int port = 55555;
 const char* ssid = "RDF_Rapture";
 const char* password = "WiFi4RDF*!";
 // Set your Static IP address
-IPAddress static_IP(192, 168, 1, 222);
+IPAddress static_IP(192, 168, 50, 222);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 
