@@ -1,4 +1,14 @@
-/// Import libraries///
+// neostruder-firmware.ino
+//
+//
+// Luis Pacheco 3/27/24
+//
+// This work may be reproduced, modified, distributed,
+// performed, and displayed for any purpose, but must
+// acknowledge this project. Copyright is retained and
+// must be preserved. The work is provided as is; no
+// warranty is provided, and users accept all liability.
+///// Import libraries///
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
